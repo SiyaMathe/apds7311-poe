@@ -15,7 +15,7 @@
  */
 
 export const environment = {
-  production: false,
+  production: true,
   
   /**
    * API Base URL - points to our Express backend
