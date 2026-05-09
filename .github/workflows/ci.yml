@@ -1,0 +1,208 @@
+# .github/workflows/ci.yml
+# ============================================================
+# APDS7311 — CI Pipeline
+# GitHub Actions Workflow
+#
+# WHAT THIS DOES:
+# Every time you push code or open a pull request, GitHub
+# automatically runs this pipeline to verify:
+#   1. Backend dependencies install cleanly
+#   2. Backend code has no syntax errors (node --check)
+#   3. Frontend dependencies install cleanly
+#   4. Frontend compiles successfully (ng build)
+#
+# WHY CI FOR A SECURITY PROJECT?
+# - Catches broken code before it reaches the main branch
+# - Ensures the app always builds in a clean environment
+# - Demonstrates professional development practices on your CV
+# - Future: add automated security scanning (e.g. npm audit, Snyk)
+#
+# GITHUB SECRETS REQUIRED:
+# Go to your repo → Settings → Secrets and variables → Actions
+# Add these secrets (used in the test job):
+#   MONGO_URI   → your MongoDB Atlas test connection string
+#   JWT_SECRET  → any long random string for testing
+#
+# HOW TO READ THIS FILE:
+# - 'on:'        → what events trigger the pipeline
+# - 'jobs:'      → parallel units of work
+# - 'steps:'     → sequential commands inside a job
+# - 'uses:'      → reusable GitHub Action from the marketplace
+# - 'run:'       → raw shell command
+# ============================================================
+
+name: APDS7311 CI — Build & Lint
+
+# ─────────────────────────────────────────────────────────────
+# TRIGGERS: when does this pipeline run?
+# ─────────────────────────────────────────────────────────────
+on:
+  push:
+    branches:
+      - main         # runs on every push to main
+      - develop      # runs on every push to develop
+  pull_request:
+    branches:
+      - main         # runs on every PR targeting main
+      - develop
+
+# ─────────────────────────────────────────────────────────────
+# JOBS
+# ─────────────────────────────────────────────────────────────
+jobs:
+
+  # ===========================================================
+  # JOB 1: Backend — Install, Lint & Security Audit
+  # ===========================================================
+  backend:
+    name: 🔧 Backend (Node.js)
+    runs-on: ubuntu-latest   # GitHub-hosted Ubuntu runner
+
+    # Test against multiple Node versions to ensure compatibility
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      # Step 1: Check out the repository code
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up the specified Node.js version
+      - name: ⚙️ Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          # Cache npm dependencies — speeds up subsequent runs
+          # Cache key is based on package-lock.json hash
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      # Step 3: Install backend dependencies
+      # 'npm ci' is preferred over 'npm install' in CI because:
+      # - It installs EXACT versions from package-lock.json
+      # - It fails if package-lock.json is out of sync
+      # - It never modifies package-lock.json
+      - name: 📦 Install backend dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      # Step 4: Check all JS files for syntax errors
+      # --check flag makes node parse the file without executing it
+      # This catches typos, missing brackets, etc.
+      - name: 🔍 Syntax check — server.js
+        working-directory: ./backend
+        run: node --check server.js
+
+      - name: 🔍 Syntax check — routes
+        working-directory: ./backend
+        run: |
+          node --check routes/userRoutes.js
+          node --check routes/postRoutes.js
+
+      - name: 🔍 Syntax check — middleware
+        working-directory: ./backend
+        run: |
+          node --check middleware/auth.js
+          node --check middleware/validate.js
+
+      - name: 🔍 Syntax check — models
+        working-directory: ./backend
+        run: |
+          node --check models/User.js
+          node --check models/Post.js
+
+      - name: 🔍 Syntax check — config
+        working-directory: ./backend
+        run: |
+          node --check config/db.js
+          node --check config/generateCert.js
+
+      # Step 5: npm audit — check for known security vulnerabilities
+      # in installed packages.
+      # --audit-level=high means only fail on HIGH or CRITICAL issues
+      # (low/moderate are reported but don't break the build)
+      - name: 🛡️ Security audit (npm audit)
+        working-directory: ./backend
+        run: npm audit --audit-level=high
+        # continue-on-error: true  ← uncomment if you want audit
+        #                            warnings but not build failures
+
+  # ===========================================================
+  # JOB 2: Frontend — Install & Build
+  # ===========================================================
+  frontend:
+    name: 🌐 Frontend (Angular 17)
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      # Install Angular CLI globally so 'ng' commands are available
+      - name: 📦 Install Angular CLI
+        run: npm install -g @angular/cli@17
+
+      # Install frontend dependencies
+      - name: 📦 Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci --legacy-peer-deps
+        # --legacy-peer-deps handles Angular peer dependency conflicts
+        # that can occur between Angular packages in CI environments
+
+      # Build the Angular app in production mode
+      # This does:
+      # - TypeScript compilation (catches type errors)
+      # - Template compilation (catches HTML binding errors)
+      # - Tree shaking (removes unused code)
+      # - Minification
+      # If ANY TypeScript or template error exists, this step FAILS
+      - name: 🏗️ Build Angular app (production)
+        working-directory: ./frontend
+        run: ng build --configuration production
+        env:
+          # Increase Node.js memory limit for large Angular builds
+          NODE_OPTIONS: --max_old_space_size=4096
+
+      # Security audit for frontend packages too
+      - name: 🛡️ Security audit (npm audit)
+        working-directory: ./frontend
+        run: npm audit --audit-level=high
+        continue-on-error: true  # frontend often has transitive warnings
+
+  # ===========================================================
+  # JOB 3: Dependency Review
+  # Checks PRs for newly introduced vulnerable dependencies
+  # Only runs on Pull Requests (not on direct pushes)
+  # ===========================================================
+  dependency-review:
+    name: 🔒 Dependency Review
+    runs-on: ubuntu-latest
+    # Only run this job for pull requests
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      # GitHub's official dependency review action
+      # Compares the dependencies in the PR against the base branch
+      # and flags any newly introduced packages with known CVEs
+      - name: 🔍 Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          # Fail the build if any HIGH or CRITICAL CVEs are introduced
+          fail-on-severity: high
+          # Allow these licenses (common open-source licenses)
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC

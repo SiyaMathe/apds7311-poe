@@ -1,0 +1,35 @@
+# ============================================================
+# APDS7311 POE — Root .gitignore
+# ============================================================
+
+# ─── SECRETS — NEVER COMMIT THESE ───────────────────────────
+# Environment variables (contains DB credentials, JWT secret)
+backend/.env
+# SSL certificates (private key must stay private)
+backend/config/ssl/
+# Any .pem files anywhere in the project
+*.pem
+
+# ─── DEPENDENCIES — TOO LARGE TO COMMIT ─────────────────────
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# ─── BUILD OUTPUT ────────────────────────────────────────────
+frontend/dist/
+frontend/.angular/
+
+# ─── LOGS ────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+
+# ─── OS / EDITOR FILES ───────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+# Keep .vscode/extensions.json so teammates get extension recommendations
+!.vscode/extensions.json
+
+# ─── TEST COVERAGE ───────────────────────────────────────────
+coverage/

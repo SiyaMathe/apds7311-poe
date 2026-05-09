@@ -1,0 +1,16 @@
+# Dependencies - never commit these (very large)
+node_modules/
+
+# Environment variables - NEVER commit (contains secrets)
+.env
+
+# SSL Certificates - keep private
+config/ssl/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,253 @@
+###
+# APDS7311 POE — Backend API Tests
+# VSCode REST Client Extension Test File
+#
+# HOW TO USE:
+# 1. Install "REST Client" by Huachao Mao from VSCode Extensions
+# 2. Start your backend: npm run dev (in /backend folder)
+# 3. Click "Send Request" above each ### block to run that test
+# 4. For HTTPS with self-signed cert, add to VSCode settings.json:
+#      "rest-client.ssl.verify": false
+#
+# RUN TESTS IN ORDER: Register → Login → copy token → protected routes
+###
+
+# ─────────────────────────────────────────────────────────────
+# VARIABLES — update @authToken and @postId after running login
+# ─────────────────────────────────────────────────────────────
+@baseUrl = https://localhost:3000/api
+@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OWZmMjg3NjQwY2JlZmY2YTVmMjZhYTgiLCJpYXQiOjE3NzgzMzIzNDAsImV4cCI6MTc3ODQxODc0MH0.5SH852c-Ao14IOy3JZei-qTDMleUsUKu-4SGLDvBJfc
+
+@postId = PASTE_POST_ID_HERE
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 1: Health Check
+# Expected: 200 OK — server is running
+# ─────────────────────────────────────────────────────────────
+GET {{baseUrl}}/health
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 2: Register New User — SUCCESS
+# Expected: 201 Created
+# ─────────────────────────────────────────────────────────────
+POST {{baseUrl}}/users/register
+Content-Type: application/json
+
+{
+  "fullName": "Siyabulela Mathe",
+  "username": "siya_gov",
+  "accountNumber": "GOV123456",
+  "idNumber": "9001011234567",
+  "password": "SecurePass@123",
+  "department": "IT Administration"
+}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 3: Register — Invalid Input (Validation Failure)
+# Expected: 400 Bad Request with errors array
+# ─────────────────────────────────────────────────────────────
+POST {{baseUrl}}/users/register
+Content-Type: application/json
+
+{
+  "fullName": "A",
+  "username": "x",
+  "accountNumber": "abc",
+  "idNumber": "123",
+  "password": "weak",
+  "department": "InvalidDept"
+}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 4: Register — Duplicate Username (Anti-Harvesting)
+# Expected: 409 — generic message (does NOT say which field conflicts)
+# ─────────────────────────────────────────────────────────────
+POST {{baseUrl}}/users/register
+Content-Type: application/json
+
+{
+  "fullName": "Another Person",
+  "username": "siya_gov",
+  "accountNumber": "GOV999999",
+  "idNumber": "8501011234567",
+  "password": "SecurePass@123",
+  "department": "Finance"
+}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 5: Login — SUCCESS
+# Expected: 200 OK with JWT token
+# → Copy the "token" value and paste it into @authToken above!
+# ─────────────────────────────────────────────────────────────
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "username": "siya_gov",
+  "password": "SecurePass@123"
+}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 6: Login — Wrong Password (Anti-Harvesting)
+# Expected: 401 — same generic message as "user not found"
+# (Never reveals WHICH field is wrong)
+# ─────────────────────────────────────────────────────────────
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "username": "siya_gov",
+  "password": "WrongPassword!"
+}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 7: Login — Non-existent Username (Anti-Harvesting)
+# Expected: 401 — IDENTICAL message to wrong password
+# (Prevents username enumeration)
+# ─────────────────────────────────────────────────────────────
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "username": "ghost_user_does_not_exist",
+  "password": "AnyPassword@1"
+}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 8: Get Current User Profile — Protected Route
+# Expected: 200 OK with user object (NO password field in response)
+# Requires: Valid @authToken from Test 5
+# ─────────────────────────────────────────────────────────────
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{authToken}}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 9: Get Current User — No Token (Unauthorised)
+# Expected: 401 — "Access denied. Authentication required."
+# ─────────────────────────────────────────────────────────────
+GET {{baseUrl}}/users/me
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 10: Get All Posts — Protected Route
+# Expected: 200 OK with posts array
+# → Copy a post _id and paste into @postId above
+# Requires: Valid @authToken
+# ─────────────────────────────────────────────────────────────
+GET {{baseUrl}}/posts
+Authorization: Bearer {{authToken}}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 11: Get All Posts — No Token
+# Expected: 401 — "Access denied. Authentication required."
+# ─────────────────────────────────────────────────────────────
+GET {{baseUrl}}/posts
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 12: Create New Post — SUCCESS
+# Expected: 201 Created with the new post object
+# Note: author is set SERVER-SIDE from JWT (cannot be spoofed)
+# Requires: Valid @authToken
+# ─────────────────────────────────────────────────────────────
+POST {{baseUrl}}/posts
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "title": "Cross-Departmental IT Infrastructure Upgrade",
+  "content": "The National IT department requires coordinated downtime across Finance and Health departments for a critical infrastructure upgrade. All departments must comply with the scheduled maintenance window on the 15th of next month.",
+  "category": "Infrastructure",
+  "priority": "High",
+  "targetDepartments": ["Finance", "Health", "IT Administration"]
+}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 13: Create Post — Validation Failure
+# Expected: 400 Bad Request with validation errors
+# ─────────────────────────────────────────────────────────────
+POST {{baseUrl}}/posts
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "title": "AB",
+  "content": "Short",
+  "category": "InvalidCategory"
+}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 14: Delete Post — SUCCESS
+# Expected: 200 OK — soft delete (isActive: false in MongoDB)
+# Requires: Valid @authToken and @postId (from Test 10 or 12)
+# ─────────────────────────────────────────────────────────────
+DELETE {{baseUrl}}/posts/{{postId}}
+Authorization: Bearer {{authToken}}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 15: Delete Post — Invalid ID Format
+# Expected: 400 — "Invalid post ID format"
+# ─────────────────────────────────────────────────────────────
+DELETE {{baseUrl}}/posts/not-a-valid-mongo-id
+Authorization: Bearer {{authToken}}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 16: Delete Post — Non-existent ID
+# Expected: 404 — "Post not found"
+# ─────────────────────────────────────────────────────────────
+DELETE {{baseUrl}}/posts/64a1b2c3d4e5f6789012abcd
+Authorization: Bearer {{authToken}}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 17: Tampered JWT — Session Security Test
+# Expected: 401 — "Invalid authentication token"
+# (Server detects the signature mismatch — payload was tampered)
+# ─────────────────────────────────────────────────────────────
+GET {{baseUrl}}/posts
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.TAMPERED_PAYLOAD.INVALID_SIGNATURE
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 18: XSS Attempt — Input Sanitization Test
+# Expected: 201 Created but title/content has HTML escaped
+# <script> tags should be stored as &lt;script&gt; (harmless)
+# ─────────────────────────────────────────────────────────────
+POST {{baseUrl}}/posts
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "title": "Security Test XSS Attempt <script>alert('xss')</script>",
+  "content": "This tests whether the backend sanitizes HTML. The script tag should be escaped and rendered harmless.",
+  "category": "Security",
+  "priority": "Critical"
+}
+
+###
+# ─────────────────────────────────────────────────────────────
+# TEST 19: NoSQL Injection Attempt
+# Expected: 401 — mongoSanitize strips the $gt operator
+# (The { "$gt": "" } would match any username without protection)
+# ─────────────────────────────────────────────────────────────
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "username": { "$gt": "" },
+  "password": "anything"
+}

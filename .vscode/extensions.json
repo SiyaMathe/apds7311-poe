@@ -1,0 +1,23 @@
+{
+  // .vscode/extensions.json
+  // When someone opens this project in VSCode, they'll be prompted
+  // to install these recommended extensions automatically.
+  "recommendations": [
+    // REST Client — for running api-tests.http
+    "humao.rest-client",
+    // Angular Language Service — IntelliSense for Angular templates
+    "Angular.ng-template",
+    // ESLint — JavaScript linting
+    "dbaeumer.vscode-eslint",
+    // GitLens — enhanced Git history and blame
+    "eamodio.gitlens",
+    // Thunder Client — alternative API testing (like Postman in VSCode)
+    "rangav.vscode-thunder-client",
+    // DotENV — syntax highlighting for .env files
+    "mikestead.dotenv",
+    // MongoDB for VSCode — browse Atlas collections from VSCode
+    "mongodb.mongodb-vscode",
+    // GitHub Actions — YAML syntax and validation for workflow files
+    "github.vscode-github-actions"
+  ]
+}
