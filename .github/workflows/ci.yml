@@ -125,7 +125,7 @@ jobs:
       - name: 🛡️ Security audit (npm audit)
         working-directory: ./backend
         run: npm audit --audit-level=high
-        # continue-on-error: true  ← uncomment if you want audit
+        continue-on-error: true  #← uncomment if you want audit
         #                            warnings but not build failures
 
   # ===========================================================
